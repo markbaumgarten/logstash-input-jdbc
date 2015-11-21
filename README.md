@@ -36,11 +36,11 @@ create table foo(
 ```
 Then the sql string in the logstash config should be:
 ```
-select * from foo where aiid>:max_id
+select * from foo where aiid>:max_id order by aiid
 ```
 or if you want to load a huge table a little at a time:
 ```
-select * from foo where aiid>:max_id limit 10000
+select * from foo where aiid>:max_id order by aiid limit 10000
 ```
 Surely we don´t need to use a seperate column for auto_increment - the primary key could also be used as long as it "auto increments".
 
