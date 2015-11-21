@@ -1,14 +1,17 @@
 # Logstash JDBC Input Plugin
-This is a modified version of the logstash-input-jdbc plugin forked from here: https://github.com/logstash-plugins/logstash-input-jdbc
+This is a modified version of the logstash-input-jdbc plugin forked from here:
+https://github.com/logstash-plugins/logstash-input-jdbc
 
+# Goal
 The goal is to optimize loading of events into elasticsearch from tables using an autoincrement column.
 
 Using this approach I believe that we can keep tables in sync with an elasticsearch index much more efficiently than using the @sql_last_start on time/date field.
 
 State is kept in the elasticsearch index - not a seperate logstash state file.
 
-The plugin requires three more config elements in the input section:
-
+# Input configuration
+The plugin requires three additional config elements in the input section:
+```
   # The mysql auto increment column
   config :mysql_auto_increment_column, :validate => :string
 
@@ -17,33 +20,38 @@ The plugin requires three more config elements in the input section:
   
   # The elasticsearch index to use when getting max_id 
   config :elasticsearch_index, :validate => :string
+  ```
   
-Example: A table created like this(not tested since i dont have my hands on a (mysql) terminal, but I think it explains enough):
+# Example
 
+A table created like this(not tested since i dont have my hands on a (mysql) terminal, but I think it explains enough):
+```
 create table foo(
    foo_id integer primary key,
    name varchar(255),
    .....other columns....
    aiid integer auto_increment
 );
-
+```
 Then the sql string in the logstash config should be:
-
+```
 select * from foo where aiid>:max_id
-
+```
 - or if you want to load a huge table a little at a time:
-
+```
 select * from foo where aiid>:max_id limit 10000
-
+```
 Surely we don´t need to use a seperate column for auto_increment - the primary key could also be used as long as it "auto increments".
 
-Limitations: If the table rows are changed, this plugin will not re-index those rows.
+# Limitations
+If the table rows are changed, this plugin will not re-index those rows.
 
-How it works: Before each execution of the sql statement, the plugin reads the max value stored in the elasticsearch index.
+# How it works
+Before each execution of the sql statement, the plugin reads the max value stored in the elasticsearch index.
 If the index is found the plugin uses the value as max_id in the sql query.
 
 Here´s a more complete input config example:
-
+```
 input {
 	jdbc {
 	    jdbc_driver_library => "/path/to/mysql-connector-java-5.1.33-bin.jar"
@@ -64,3 +72,4 @@ input {
 	    elasticsearch_index => "myindex" 
 	}
 }
+```
