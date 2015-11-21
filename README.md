@@ -1,15 +1,16 @@
-# Logstash JDBC Input Plugin
+# Logstash JDBC Input Plugin - auto increment
 This is a modified version of the logstash-input-jdbc plugin forked from here:
+
 https://github.com/logstash-plugins/logstash-input-jdbc
 
-# Goal
+## Goal
 The goal is to optimize loading of events into elasticsearch from tables using an autoincrement column.
 
-Using this approach I believe that we can keep tables in sync with an elasticsearch index much more efficiently than using the @sql_last_start on time/date field.
+Using this approach I believe that we can keep tables in sync with an elasticsearch index more efficiently than using the @sql_last_start on time/date field.
 
 State is kept in the elasticsearch index - not a seperate logstash state file.
 
-# Input configuration
+## Input configuration
 The plugin requires three additional config elements in the input section:
 ```
   # The mysql auto increment column
@@ -22,7 +23,7 @@ The plugin requires three additional config elements in the input section:
   config :elasticsearch_index, :validate => :string
   ```
   
-# Example
+## Example
 
 A table created like this(not tested since i dont have my hands on a (mysql) terminal, but I think it explains enough):
 ```
@@ -37,16 +38,16 @@ Then the sql string in the logstash config should be:
 ```
 select * from foo where aiid>:max_id
 ```
-- or if you want to load a huge table a little at a time:
+or if you want to load a huge table a little at a time:
 ```
 select * from foo where aiid>:max_id limit 10000
 ```
 Surely we don´t need to use a seperate column for auto_increment - the primary key could also be used as long as it "auto increments".
 
-# Limitations
+## Limitations
 If the table rows are changed, this plugin will not re-index those rows.
 
-# How it works
+## How it works
 Before each execution of the sql statement, the plugin reads the max value stored in the elasticsearch index.
 If the index is found the plugin uses the value as max_id in the sql query.
 
