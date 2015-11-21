@@ -44,14 +44,31 @@ select * from foo where aiid>:max_id limit 10000
 ```
 Surely we don´t need to use a seperate column for auto_increment - the primary key could also be used as long as it "auto increments".
 
-## Limitations
-If the table rows are changed, this plugin will not re-index those rows.
-
 ## How it works
 Before each execution of the sql statement, the plugin reads the max value stored in the elasticsearch index.
 If the index is found the plugin uses the value as max_id in the sql query.
 
-Here´s a more complete input config example:
+#### The elasticsearch query used
+
+```
+{
+  "filter" : {
+    "match_all" : { }
+  },
+  "sort": [
+    {
+      "aiid": {
+        "order": "desc"
+      }
+    }
+  ],
+  "size": 1
+}
+```
+
+
+
+#### A complete input config example
 ```
 input {
 	jdbc {
@@ -74,3 +91,5 @@ input {
 	}
 }
 ```
+## Limitations
+If the table rows are changed, this plugin will not re-index those rows.
