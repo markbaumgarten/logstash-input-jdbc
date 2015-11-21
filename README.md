@@ -13,15 +13,16 @@ State is kept in the elasticsearch index - not a seperate logstash state file.
 ## Input configuration
 The plugin requires three additional config elements in the input section:
 ```
-  # The mysql auto increment column
-  config :mysql_auto_increment_column, :validate => :string
-
-  # The url for elasticsearch
-  config :elasticsearch_hosts, :validate => :string
+  - The (mysql) auto increment column
+  mysql_auto_increment_column => "aiid"
   
-  # The elasticsearch index to use when getting max_id 
-  config :elasticsearch_index, :validate => :string
-  ```
+  - The url for elasticsearch
+  (I´m not a ruby expert...wanted to use multiple hosts....but for now only a single host works despite using plural):  
+  elasticsearch_hosts => "127.0.0.1:9200"
+  
+  - The elasticsearch index to use when getting max_id
+  elasticsearch_index => "myindex" 
+```
   
 ## Example
 
