@@ -3,6 +3,7 @@ require "logstash/inputs/base"
 require "logstash/namespace"
 require "logstash/plugin_mixins/jdbc"
 require "yaml" # persistence
+require "elasticsearch"
 
 # This plugin was created as a way to ingest data in any database
 # with a JDBC interface into Logstash. You can periodically schedule ingestion
@@ -127,6 +128,15 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   # There is no schedule by default. If no schedule is given, then the statement is run
   # exactly once.
   config :schedule, :validate => :string
+  
+  # The mysql auto increment column
+  config :mysql_auto_increment_column, :validate => :string
+
+  # The url for elasticsearch
+  config :elasticsearch_hosts, :validate => :string
+  
+  # The elasticsearch index to use when getting max_id 
+  config :elasticsearch_index, :validate => :string
 
   # Path to file with last run time
   config :last_run_metadata_path, :validate => :string, :default => "#{ENV['HOME']}/.logstash_jdbc_last_run"
@@ -182,10 +192,35 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   end
 
   private
+  def get_max_aiid()
+      client = Elasticsearch::Client.new log: true, hosts: @elasticsearch_hosts
+      health = client.cluster.health
+      if health['status'] == 'red'
+          print "Cluster health is bad!!! Returning -1"
+          return -1
+      end
+  
+      begin
+          res = client.search index: @elasticsearch_index, body: {
+              filter: { match_all: { } },
+              sort: [ { aiid: {order:'desc'}} ],
+              size: 1 
+          }
+          return res['hits']['hits'][0]['_source'][@mysql_auto_increment_column]
+      rescue
+          print "Failed getting max id. Returning 0"
+          return 0
+      end
+    end
 
   def execute_query(queue)
     # update default parameters
-    @parameters['sql_last_start'] = @sql_last_start
+    max_id = get_max_aiid()
+    if max_id < 0
+        return
+    end
+
+    @parameters['max_id'] = max_id
     execute_statement(@statement, @parameters) do |row|
       event = LogStash::Event.new(row)
       decorate(event)
