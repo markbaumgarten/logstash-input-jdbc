@@ -48,19 +48,30 @@ If the index is found the plugin uses the value as max_id in the sql query.
 #### The elasticsearch query used
 
 ```
-{
-  "filter" : {
-    "match_all" : { }
-  },
-  "sort": [
-    {
-      "aiid": {
-        "order": "desc"
-      }
-    }
-  ],
-  "size": 1
-}
+q = '{
+        "query": {
+            "bool": { 
+                "must": [
+                    {
+                        "range": {
+                            "'+type_aiid+'": {
+                                "gte": "0"
+                            }
+                        } 
+                    }
+                ] 
+            }
+        },
+        "from": 0,
+        "size": 1,
+        "sort": [
+            {
+                "'+type_aiid+'": {
+                    "order": "desc"
+                }
+            }
+        ]
+    }'
 ```
 
 
