@@ -65,7 +65,7 @@ If the index is found the plugin uses the value as max_id in the sql query.
 
 
 
-#### A complete mysql->elasticsearch config example
+#### A complete mysql > elasticsearch config example
 ```
 input {
   jdbc {
