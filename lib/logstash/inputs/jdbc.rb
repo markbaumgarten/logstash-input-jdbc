@@ -4,6 +4,8 @@ require "logstash/namespace"
 require "logstash/plugin_mixins/jdbc"
 require "yaml" # persistence
 require "elasticsearch"
+require "json"
+require "rest-client"
 
 # This plugin was created as a way to ingest data in any database
 # with a JDBC interface into Logstash. You can periodically schedule ingestion
@@ -133,11 +135,17 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
   config :mysql_auto_increment_column, :validate => :string
 
   # The url for elasticsearch
-  config :elasticsearch_hosts, :validate => :string
+  config :elasticsearch_host, :validate => :string
   
   # The elasticsearch index to use when getting max_id 
   config :elasticsearch_index, :validate => :string
-
+  
+  # The type to use when storing rows in es
+  config :elasticsearch_type, :validate => :string
+  
+  # Enable or disable logging for es client
+  config :elasticsearch_logging, :validate => :boolean, :default => false
+  
   # Path to file with last run time
   config :last_run_metadata_path, :validate => :string, :default => "#{ENV['HOME']}/.logstash_jdbc_last_run"
 
@@ -193,25 +201,88 @@ class LogStash::Inputs::Jdbc < LogStash::Inputs::Base
 
   private
   def get_max_aiid()
-      client = Elasticsearch::Client.new log: true, hosts: @elasticsearch_hosts
-      health = client.cluster.health
-      if health['status'] == 'red'
-          print "Cluster health is bad!!! Returning -1"
-          return -1
-      end
-  
-      begin
-          res = client.search index: @elasticsearch_index, body: {
-              filter: { match_all: { } },
-              sort: [ { aiid: {order:'desc'}} ],
-              size: 1 
-          }
-          return res['hits']['hits'][0]['_source'][@mysql_auto_increment_column]
-      rescue
-          print "Failed getting max id. Returning 0"
-          return 0
-      end
+    #type = 'qf'
+	type = @elasticsearch_type
+	
+    #aiid = 'aiid'
+	aiid = @mysql_auto_increment_column
+	
+    #the_index = 'test_qf'
+	the_index = @elasticsearch_index
+	
+    es_logging = @elasticsearch_logging
+	
+    #es_host = 'http://127.0.0.1:9200'
+	es_host = @elasticsearch_host
+
+    type_aiid = type + '.' + aiid
+    q = '{
+        "query": {
+            "bool": { 
+                "must": [
+                    {
+                        "range": {
+                            "'+type_aiid+'": {
+                                "gte": "0"
+                            }
+                        } 
+                    }
+                ] 
+            }
+        },
+        "from": 0,
+        "size": 1,
+        "sort": [
+            {
+                "'+type_aiid+'": {
+                    "order": "desc"
+                }
+            }
+        ]
+    }'
+
+    # Connect to elastisearch
+    client = Elasticsearch::Client.new host:es_host, log: es_logging
+
+    # Verify health
+    health = client.cluster.health
+    if health['status'] == 'red'
+        puts "Cluster health is bad!!! Returning -1"
+        return -1
     end
+   
+    # Make refresh prior to query
+    begin 
+        client.indices.refresh index:the_index
+    rescue
+        puts "An error ocurred while refreshing index...returning -1"
+        return -1
+    end
+
+    # Find max aiid
+    begin
+        res = JSON.parse \
+            RestClient.get(es_host + '/' + the_index + '/' + type + '/_search',
+                           params: { source: q})
+
+		if res['hits']['hits'].length == 0
+			puts "No documents of given type found. Returning 0"
+			return 0
+		end
+		# We have a document - and know the max_id - return it
+        return res['hits']['hits'][0]['_source'][aiid]
+    rescue RestClient::ResourceNotFound
+        # The index does not exist
+        # This is fine - it will be created automatically
+        puts "Failed getting max id(Index not there yet). Returning 0"
+        return 0
+    rescue
+        puts "Non expected error ocurred. Returning -1"
+        return -1
+    end
+  end
+  
+  
 
   def execute_query(queue)
     # update default parameters
