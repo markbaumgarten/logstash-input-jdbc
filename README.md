@@ -11,17 +11,13 @@ Using this approach I believe that we can keep tables in sync with an elasticsea
 State is kept in the elasticsearch index - not a seperate logstash state file.
 
 ## Input configuration
-The plugin requires three additional config elements in the input section:
+The plugin requires a few additional config elements in the input section(see logstash-mysql.conf for complete example):
 ```
-  - The (mysql) auto increment column
+  elasticsearch_host => "http://127.0.0.1:9200"
+  elasticsearch_index => "bar"
+  elasticsearch_type => "qf"
+  elasticsearch_logging => true
   mysql_auto_increment_column => "aiid"
-  
-  - The url for elasticsearch
-  (I´m not a ruby expert...wanted to use multiple hosts....but for now only a single host works despite using plural):  
-  elasticsearch_hosts => "127.0.0.1:9200"
-  
-  - The elasticsearch index to use when getting max_id
-  elasticsearch_index => "myindex" 
 ```
   
 ## Example
@@ -69,28 +65,35 @@ If the index is found the plugin uses the value as max_id in the sql query.
 
 
 
-#### A complete input config example
+#### A complete mysql->elasticsearch config example
 ```
 input {
-	jdbc {
-	    jdbc_driver_library => "/path/to/mysql-connector-java-5.1.33-bin.jar"
-	    jdbc_driver_class => "com.mysql.jdbc.Driver"
-	    jdbc_connection_string => "jdbc:mysql://host:port/database"
-	    jdbc_user => "user"
-	    jdbc_password => "password"
-	    statement => "select * from foo where aiid > :max_id limit 10000"
-	    
-	    # No longer used:
-	    # jdbc_paging_enabled => "true"
-	    # jdbc_page_size => "50000"
-	
-	    # New config elements:
-	    mysql_auto_increment_column => "aiid"
-	    # Im not a ruby developer...wanted to use multiple hosts....but for now only a single host works:
-	    elasticsearch_hosts => "127.0.0.1:9200"
-	    elasticsearch_index => "myindex" 
-	}
+  jdbc {
+    jdbc_driver_library => "mysql-connector-java-5.1.37-bin.jar"
+    jdbc_driver_class => "com.mysql.jdbc.Driver"
+    jdbc_connection_string => "jdbc:mysql://127.0.0.1:3306/foo"
+    jdbc_validate_connection => true
+    jdbc_user => "foo_user"
+    jdbc_password => "foo_passwd"
+    elasticsearch_host => "http://127.0.0.1:9200"
+    elasticsearch_index => "bar"
+    elasticsearch_type => "qf"
+    elasticsearch_logging => true
+    mysql_auto_increment_column => "aiid"
+    schedule => "* * * * *"
+    statement => "select aiid, id as foo_id, replace(value, '\\', '/') as path from foo_table where aiid>:max_id order by aiid limit 100000"
+  }
 }
+
+output {
+  elasticsearch {
+    hosts => ["127.0.0.1:9200", "127.0.0.2:9200", "127.0.0.3:9200"]
+    index => "bar"           # Must be the same as defined in the input config above
+    document_type => "qf"    # Must be the same as elasticsearch_type in input config above
+  }
+}
+
+
 ```
 ## Limitations
 If the table rows are changed, this plugin will not re-index those rows.
